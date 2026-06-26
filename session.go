@@ -7,13 +7,13 @@ type Session struct {
 	ChatID   int64
 }
 
-type key struct{}
+type sessionKey struct{}
 
 func NewContext(ctx context.Context, s *Session) context.Context {
-	return context.WithValue(ctx, key{}, s)
+	return context.WithValue(ctx, sessionKey{}, s)
 }
 
 func FromContext(ctx context.Context) (s *Session, ok bool) {
-	s, ok = ctx.Value(key{}).(*Session)
+	s, ok = ctx.Value(sessionKey{}).(*Session)
 	return
 }

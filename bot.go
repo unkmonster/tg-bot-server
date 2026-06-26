@@ -14,6 +14,8 @@ import (
 const (
 	DefaultSep = " "
 
+	defaultParseMode = "html"
+
 	CmdRequest      = "cmd"
 	TextRequest     = "text"
 	CallbackRequest = "callback"
@@ -108,6 +110,12 @@ func WithLogger(logger log.Logger) Option {
 	}
 }
 
+func WithMiddleware(m ...Middleware) Option {
+	return func(b *Bot) {
+		b.middleware = MiddlewareChain(m...)
+	}
+}
+
 type Bot struct {
 	*router
 	log *log.Helper
@@ -117,6 +125,8 @@ type Bot struct {
 
 	cancel context.CancelFunc
 	done   chan struct{}
+
+	middleware Middleware
 }
 
 func New(
@@ -169,7 +179,7 @@ func (b *Bot) worker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case update := <-updates:
-			b.handleUpdate(ctx, update)
+			go b.handleUpdate(ctx, update)
 		}
 	}
 }
@@ -190,6 +200,9 @@ func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
 		return
 	}
 
+	if b.middleware != nil {
+		h = b.middleware(h)
+	}
 	reply, err := h(ctx, r)
 	if err != nil {
 		reply = formatError(err)
@@ -264,12 +277,12 @@ func setMessageReplyDefaults(v *tgbotapi.MessageConfig, up tgbotapi.Update) {
 		v.ChatID = chatId
 	}
 	// group mode
-	if v.ReplyToMessageID == 0 && chatId != senderId {
-		v.ReplyToMessageID = int(senderId)
+	if v.ReplyToMessageID == 0 && chatId != senderId && up.Message != nil {
+		v.ReplyToMessageID = up.Message.MessageID
 	}
 
 	if v.ParseMode == "" {
-		v.ParseMode = "html"
+		v.ParseMode = defaultParseMode
 	}
 }
 
