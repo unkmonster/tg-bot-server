@@ -9,6 +9,7 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/samber/lo"
 )
 
 const (
@@ -28,6 +29,11 @@ type Request struct {
 	typ  string // request type
 	cmd  string
 	args []string // parsed arguments with cmd
+}
+
+type Reply struct {
+	Message  *tgbotapi.MessageConfig
+	Callback *tgbotapi.CallbackConfig
 }
 
 func NewRequest(update tgbotapi.Update) *Request {
@@ -151,12 +157,12 @@ func (b *Bot) Start(ctx context.Context) error {
 	b.cancel = cancel
 
 	go b.worker(ctx)
-	b.log.WithContext(ctx).Infof("[Bot] worker started")
+	b.log.WithContext(ctx).Infof("[Bot] worker started: %s", b.api.Self.UserName)
 	return nil
 }
 
 func (b *Bot) Stop(ctx context.Context) error {
-	b.log.WithContext(ctx).Infof("[Bot] worker stopping")
+	b.log.WithContext(ctx).Infof("[Bot] worker stopping: %s", b.api.Self.UserName)
 	b.cancel()
 	<-b.done
 	return nil
@@ -185,17 +191,27 @@ func (b *Bot) worker(ctx context.Context) {
 }
 
 func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
-	r := NewRequest(up)
-
-	s := newSession(up)
+	var (
+		r      = NewRequest(up)
+		s      = newSession(up)
+		errMsg *tgbotapi.MessageConfig
+	)
 	ctx = NewContext(ctx, s)
 
+	log := log.NewHelper(log.With(
+		b.log.Logger(),
+		"update.id", up.UpdateID,
+		"session.chat_id", s.ChatID,
+		"session.sender_id", s.SenderID,
+		"request.cmd", r.Cmd(),
+		"request.type", r.Type(),
+	))
+
+	// match handler
 	h := b.router.match(r)
 	if h == nil {
-		b.log.WithContext(ctx).Debugw(
+		log.WithContext(ctx).Debugw(
 			"event", "no any handler matched",
-			"request.cmd", r.Cmd(),
-			"request.type", r.Type(),
 		)
 		return
 	}
@@ -205,23 +221,51 @@ func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
 	}
 	reply, err := h(ctx, r)
 	if err != nil {
-		reply = formatError(err)
+		errMsg = lo.ToPtr(formatError(err))
+		setMessageReplyDefaults(errMsg, up)
 	}
-	reply = setReplyDefaults(reply, up)
 
-	_, err = b.api.Request(reply)
-	if err != nil {
-		b.log.WithContext(ctx).Errorw(
-			"msg", "failed to send reply",
-			"reason", err,
-			"update.id", up.UpdateID,
-			"session.chat_id", s.ChatID,
-			"session.sender_id", s.SenderID,
-			"request.cmd", r.Cmd(),
-			"request.type", r.Type(),
-		)
+	// send replies
+	if errMsg != nil {
+		_, err := b.api.Send(errMsg)
+		if err != nil {
+			log.WithContext(ctx).Errorw(
+				"event", "failed to send error message",
+				"reason", err,
+			)
+		}
 		return
 	}
+
+	if reply.Message != nil {
+		_, err := b.sendMessage(ctx, up, reply.Message)
+		if err != nil {
+			log.WithContext(ctx).Errorw(
+				"event", "failed to send message",
+				"reason", err,
+			)
+		}
+	}
+
+	if reply.Callback != nil {
+		_, err := b.sendCallback(ctx, up, reply.Callback)
+		if err != nil {
+			log.WithContext(ctx).Errorw(
+				"event", "failed to send callback",
+				"reason", err,
+			)
+		}
+	}
+}
+
+func (b *Bot) sendMessage(ctx context.Context, up tgbotapi.Update, msg *tgbotapi.MessageConfig) (tgbotapi.Message, error) {
+	setMessageReplyDefaults(msg, up)
+	return b.api.Send(msg)
+}
+
+func (b *Bot) sendCallback(ctx context.Context, up tgbotapi.Update, callback *tgbotapi.CallbackConfig) (tgbotapi.Message, error) {
+	setCallbackReplyDefaults(callback, up)
+	return b.api.Send(callback)
 }
 
 func newSession(up tgbotapi.Update) *Session {

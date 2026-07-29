@@ -8,6 +8,7 @@ import (
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/samber/lo"
 	tgbotserver "github.com/unkmonster/tg-bot-server"
 )
 
@@ -27,14 +28,21 @@ func main() {
 		),
 	)
 
-	s.OnCommand("echo", func(ctx context.Context, r *tgbotserver.Request) (tgbotapi.Chattable, error) {
+	s.OnCommand("echo", func(ctx context.Context, r *tgbotserver.Request) (*tgbotserver.Reply, error) {
 		args := r.Args()
-		return tgbotapi.NewMessage(0, strings.Join(args, " ")), nil
+		text := strings.Join(args, " ")
+
+		if text == "" {
+			return nil, errors.BadRequest("EMPTY_ARGS", "参数不可为空")
+		}
+		return &tgbotserver.Reply{
+			Message: lo.ToPtr(tgbotapi.NewMessage(0, text)),
+		}, nil
 	})
-	s.OnCommand("error", func(ctx context.Context, r *tgbotserver.Request) (tgbotapi.Chattable, error) {
+	s.OnCommand("error", func(ctx context.Context, r *tgbotserver.Request) (*tgbotserver.Reply, error) {
 		return nil, errors.New(500, "TEST_ERROR", "手动触发")
 	})
-	s.OnCommand("panic", func(ctx context.Context, r *tgbotserver.Request) (tgbotapi.Chattable, error) {
+	s.OnCommand("panic", func(ctx context.Context, r *tgbotserver.Request) (*tgbotserver.Reply, error) {
 		panic("test")
 	})
 

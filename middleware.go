@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type Middleware func(next HandleRequestFunc) HandleRequestFunc
+type Middleware func(next HandleFunc) HandleFunc
 
 func MiddlewareChain(middlewares ...Middleware) Middleware {
-	return func(next HandleRequestFunc) HandleRequestFunc {
+	return func(next HandleFunc) HandleFunc {
 		for i := len(middlewares) - 1; i >= 0; i-- {
 			next = middlewares[i](next)
 		}
@@ -21,8 +20,8 @@ func MiddlewareChain(middlewares ...Middleware) Middleware {
 }
 
 func Logging(logger log.Logger) Middleware {
-	return func(next HandleRequestFunc) HandleRequestFunc {
-		return func(ctx context.Context, r *Request) (tgbotapi.Chattable, error) {
+	return func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, r *Request) (*Reply, error) {
 			var (
 				start          = time.Now()
 				level          = log.LevelInfo
@@ -76,8 +75,8 @@ func Logging(logger log.Logger) Middleware {
 }
 
 func Panic() Middleware {
-	return func(next HandleRequestFunc) HandleRequestFunc {
-		return func(ctx context.Context, r *Request) (c tgbotapi.Chattable, err error) {
+	return func(next HandleFunc) HandleFunc {
+		return func(ctx context.Context, r *Request) (reply *Reply, err error) {
 			defer func() {
 				r := recover()
 				if r == nil {
@@ -85,7 +84,7 @@ func Panic() Middleware {
 				}
 				err = fmt.Errorf("recover: %v", r)
 			}()
-			c, err = next(ctx, r)
+			reply, err = next(ctx, r)
 			return
 		}
 	}

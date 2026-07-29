@@ -2,42 +2,40 @@ package tgbotserver
 
 import (
 	"context"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-type HandleRequestFunc func(ctx context.Context, r *Request) (tgbotapi.Chattable, error)
+type HandleFunc func(ctx context.Context, r *Request) (*Reply, error)
 
 // ConditionHandler if Match return true apply Handler
 type ConditionHandler struct {
 	Cond    func(r *Request) bool
-	Handler HandleRequestFunc
+	Handler HandleFunc
 }
 
 type router struct {
-	commandHandlers   map[string]HandleRequestFunc
-	textHandlers      map[string]HandleRequestFunc
-	callbackHandlers  map[string]HandleRequestFunc
+	commandHandlers   map[string]HandleFunc
+	textHandlers      map[string]HandleFunc
+	callbackHandlers  map[string]HandleFunc
 	conditionHandlers []ConditionHandler
 }
 
 func newRouter() *router {
 	return &router{
-		commandHandlers:  map[string]HandleRequestFunc{},
-		textHandlers:     map[string]HandleRequestFunc{},
-		callbackHandlers: map[string]HandleRequestFunc{},
+		commandHandlers:  map[string]HandleFunc{},
+		textHandlers:     map[string]HandleFunc{},
+		callbackHandlers: map[string]HandleFunc{},
 	}
 }
 
-func (r *router) OnCommand(cmd string, h HandleRequestFunc) {
+func (r *router) OnCommand(cmd string, h HandleFunc) {
 	r.commandHandlers[cmd] = h
 }
 
-func (r *router) OnText(text string, h HandleRequestFunc) {
+func (r *router) OnText(text string, h HandleFunc) {
 	r.textHandlers[text] = h
 }
 
-func (r *router) OnCallback(cmd string, h HandleRequestFunc) {
+func (r *router) OnCallback(cmd string, h HandleFunc) {
 	r.callbackHandlers[cmd] = h
 }
 
@@ -48,10 +46,10 @@ func (r *router) AddConditionHandler(h ConditionHandler) {
 type matchResult struct {
 	Type     string
 	Key      string
-	Handlers []HandleRequestFunc
+	Handlers []HandleFunc
 }
 
-func (r *router) match(req *Request) (h HandleRequestFunc) {
+func (r *router) match(req *Request) (h HandleFunc) {
 	var (
 		cmd = req.Cmd()
 	)
