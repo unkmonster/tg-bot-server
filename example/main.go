@@ -36,7 +36,7 @@ func main() {
 			return nil, errors.BadRequest("EMPTY_ARGS", "参数不可为空")
 		}
 		return &tgbotserver.Reply{
-			Message: lo.ToPtr(tgbotapi.NewMessage(0, text)),
+			Messages: []tgbotapi.Chattable{lo.ToPtr(tgbotapi.NewMessage(0, text))},
 		}, nil
 	})
 	s.OnCommand("error", func(ctx context.Context, r *tgbotserver.Request) (*tgbotserver.Reply, error) {

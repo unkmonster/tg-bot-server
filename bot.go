@@ -32,8 +32,7 @@ type Request struct {
 }
 
 type Reply struct {
-	Message  *tgbotapi.MessageConfig
-	Callback *tgbotapi.CallbackConfig
+	Messages []tgbotapi.Chattable
 }
 
 func NewRequest(update tgbotapi.Update) *Request {
@@ -237,22 +236,15 @@ func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
 		return
 	}
 
-	if reply.Message != nil {
-		_, err := b.sendMessage(ctx, up, reply.Message)
-		if err != nil {
-			log.WithContext(ctx).Errorw(
-				"event", "failed to send message",
-				"reason", err,
-			)
-		}
-	}
+	for i, chattable := range reply.Messages {
+		c := setChattableDefaults(chattable, up)
 
-	if reply.Callback != nil {
-		_, err := b.sendCallback(ctx, up, reply.Callback)
+		_, err := b.api.Request(c)
 		if err != nil {
 			log.WithContext(ctx).Errorw(
-				"event", "failed to send callback",
+				"msg", "failed to send chattable",
 				"reason", err,
+				"chattable.index", i,
 			)
 		}
 	}
@@ -344,7 +336,7 @@ func setCallbackReplyDefaults(v *tgbotapi.CallbackConfig, up tgbotapi.Update) {
 	}
 }
 
-func setReplyDefaults(reply tgbotapi.Chattable, up tgbotapi.Update) tgbotapi.Chattable {
+func setChattableDefaults(reply tgbotapi.Chattable, up tgbotapi.Update) tgbotapi.Chattable {
 	if reply == nil {
 		return nil
 	}
