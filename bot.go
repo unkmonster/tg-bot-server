@@ -312,9 +312,8 @@ func setMessageReplyDefaults(v *tgbotapi.MessageConfig, up tgbotapi.Update) {
 	if v.ChatID == 0 {
 		v.ChatID = chatId
 	}
-	// group mode
-	if v.ReplyToMessageID == 0 && chatId != senderId && up.Message != nil {
-		v.ReplyToMessageID = up.Message.MessageID
+	if v.ReplyParameters.MessageID == 0 && chatId != senderId && up.Message != nil {
+		v.ReplyParameters.MessageID = up.Message.MessageID
 	}
 
 	if v.ParseMode == "" {
