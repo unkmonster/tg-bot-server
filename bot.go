@@ -192,16 +192,23 @@ func (b *Bot) worker(ctx context.Context) {
 func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
 	var (
 		r      = NewRequest(up)
-		s      = newSession(up)
 		errMsg *tgbotapi.MessageConfig
+
+		chatID   int64
+		senderID int64
 	)
-	ctx = NewContext(ctx, s)
+	if c := up.FromChat(); c != nil {
+		chatID = c.ID
+	}
+	if u := up.SentFrom(); u != nil {
+		senderID = u.ID
+	}
 
 	log := log.NewHelper(log.With(
 		b.log.Logger(),
 		"update.id", up.UpdateID,
-		"session.chat_id", s.ChatID,
-		"session.sender_id", s.SenderID,
+		"chat.id", chatID,
+		"sender.id", senderID,
 		"request.cmd", r.Cmd(),
 		"request.type", r.Type(),
 	))
@@ -258,23 +265,6 @@ func (b *Bot) sendMessage(ctx context.Context, up tgbotapi.Update, msg *tgbotapi
 func (b *Bot) sendCallback(ctx context.Context, up tgbotapi.Update, callback *tgbotapi.CallbackConfig) (tgbotapi.Message, error) {
 	setCallbackReplyDefaults(callback, up)
 	return b.api.Send(callback)
-}
-
-func newSession(up tgbotapi.Update) *Session {
-	s := &Session{}
-	if user := up.SentFrom(); user != nil {
-		s.SenderID = user.ID
-	}
-
-	if chat := up.FromChat(); chat != nil {
-		s.ChatID = chat.ID
-	}
-	return s
-}
-
-func newContext(ctx context.Context, up tgbotapi.Update) context.Context {
-	s := newSession(up)
-	return NewContext(ctx, s)
 }
 
 func formatError(err error) tgbotapi.MessageConfig {
