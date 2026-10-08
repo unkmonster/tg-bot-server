@@ -24,28 +24,22 @@ const (
 )
 
 type Request struct {
+	// Deprecated: Update is kept only for backward compatibility and is not
+	// guaranteed to stay in sync with future changes to Request's parsing.
+	// Use GetUpdate instead.
 	Update tgbotapi.Update
 
+	bot  tgbotapi.User
 	typ  string // request type
 	cmd  string
 	args []string // parsed arguments with cmd
 }
 
-type Reply struct {
-	Messages []tgbotapi.Chattable
-}
-
-func NewRequest(update tgbotapi.Update) *Request {
+func NewRequest(update tgbotapi.Update, self tgbotapi.User) *Request {
 	rv := &Request{
 		Update: update,
+		bot:    self,
 	}
-
-	// if c := update.FromChat(); c != nil {
-	// 	rv.chatID = c.ID
-	// }
-	// if s := update.SentFrom(); s != nil {
-	// 	rv.senderID = s.ID
-	// }
 
 	if update.Message != nil {
 		if update.Message.IsCommand() {
@@ -80,6 +74,16 @@ func NewRequest(update tgbotapi.Update) *Request {
 	return rv
 }
 
+// GetUpdate returns the underlying update the request was built from.
+func (r *Request) GetUpdate() tgbotapi.Update {
+	return r.Update
+}
+
+// Bot returns the bot's own user info the request was received by.
+func (r *Request) Bot() tgbotapi.User {
+	return r.bot
+}
+
 // Cmd returns request cmd
 func (r *Request) Cmd() string {
 	return r.cmd
@@ -95,6 +99,10 @@ func (r *Request) Args() []string {
 	rv := make([]string, len(r.args))
 	copy(rv, r.args)
 	return rv
+}
+
+type Reply struct {
+	Messages []tgbotapi.Chattable
 }
 
 type Option func(b *Bot)
@@ -191,7 +199,7 @@ func (b *Bot) worker(ctx context.Context) {
 
 func (b *Bot) handleUpdate(ctx context.Context, up tgbotapi.Update) {
 	var (
-		r      = NewRequest(up)
+		r      = NewRequest(up, b.api.Self)
 		errMsg *tgbotapi.MessageConfig
 
 		chatID   int64
