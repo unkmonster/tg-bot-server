@@ -58,3 +58,7 @@ Logging/errors throughout the library use `github.com/go-kratos/kratos/v2/log` a
 `github.com/go-kratos/kratos/v2/errors`, not the standard library — follow that convention when adding
 new code (e.g. construct errors with `errors.New`/`errors.BadRequest` so they carry a reason code that
 `formatError` can serialize).
+
+## 设计原则
+
+稳健第一，作任何修改前要考虑，不到万不得已绝不破坏向下兼容性，不要有过度的代码洁癖
